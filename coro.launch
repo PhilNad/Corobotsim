@@ -209,7 +209,7 @@
 	<node if="$(arg sim)" name="joint_state_controller_spawner" pkg="controller_manager" type="controller_manager" args="spawn joint_state_controller" respawn="false" output="screen"/>
 
 	<!-- Launch gripper service -->
-        <include file="$(find gripper_2f85)/launch/gripper_2f85.launch">
+        <include file="$(find robotiq_2f85_control_service)/launch/robotiq_2f85_control_service.launch">
             <arg name="simulation" value="$(arg sim)" />
             <arg name="gripperTTY" value="$(arg gripperTTY)" />
         </include>

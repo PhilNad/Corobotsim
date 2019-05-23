@@ -115,8 +115,15 @@ if __name__ == "__main__":
     #Put the round on top of the round slot
     #X:(0.2+0.114909)-(0.41125)=-0.0963
     #Y:-(0.2+0.05)-(0.1-0.065)=-0.285
-    #-0.0752 -0.168
-    simRob.goRel(goal_pos_rel=(-0.0877,-0.162,0))
+    simRob.goRel(goal_pos_rel=(-0.096,-0.162,0))
+
+    #Put the rod down and release it
+    simRob.goRel(goal_pos_rel=(0,0,-0.05))
+    simRob.set_gripper_closing(0)
+    rospy.sleep(1)
+
+    #Go back to our retreated position
+    simRob.go(goal_pos=(0.41125,0.1,1.15), goal_orient=(90,0,90), sync=True)
 
     #Below code is for spawnTestCube() friction tests
     #simRob.goRel(goal_pos_rel=(0,-0.108,0))

@@ -6,6 +6,7 @@ from gazebo_msgs.srv import SpawnModel
 from gazebo_msgs.srv import SpawnModelRequest
 from geometry_msgs.msg import Pose
 from geometry_msgs.msg import PoseStamped
+import time
 
 class sceneManager:
     #Constructor needs to receive a properly initialized rospy instance
@@ -33,7 +34,7 @@ class sceneManager:
         self.moveit_scene.add_box(name, box_pose, size=size)
         #DO NOT REMOVE this delay, its needed 
         # to let the PlanningSceneInterface update.
-        self.rospy.sleep(1)
+        time.sleep(1)
 
         print("Objects added to MoveIt planning scene:")
         print(self.moveit_scene.get_known_object_names())
@@ -41,7 +42,7 @@ class sceneManager:
     #Spawn the base in which we will insert the rods
     def spawnInsertionBase(self):
         #Open the original SDF file
-        path = self.BASE_PATH + 'Base.sdf'
+        path = self.BASE_PATH + 'BaseLooseFit.sdf'
         with open(path, 'r') as basefile:
             model_xml=basefile.read()
         base = deepcopy(model_xml)
@@ -65,7 +66,7 @@ class sceneManager:
         req.initial_pose.position.y = -0.2
         req.initial_pose.position.z = 1.01
         resp = spawn_model(req)
-        self.rospy.sleep(1)
+        time.sleep(1)
 
     #Spawn the round rod
     def spawnInsertionRoundRod(self):
@@ -94,7 +95,7 @@ class sceneManager:
         req.initial_pose.position.y = 0
         req.initial_pose.position.z = 1.01
         resp = spawn_model(req)
-        self.rospy.sleep(1)
+        time.sleep(1)
 
     #Spawn the square rod
     def spawnInsertionSquareRod(self):
@@ -125,7 +126,7 @@ class sceneManager:
         req.initial_pose.position.y = 0
         req.initial_pose.position.z = 1.01
         resp = spawn_model(req)
-        self.rospy.sleep(1)
+        time.sleep(1)
 
     #Spawn the hexagonal rod
     def spawnInsertionHexagonalRod(self):
@@ -154,7 +155,7 @@ class sceneManager:
         req.initial_pose.position.y = 0
         req.initial_pose.position.z = 1.01
         resp = spawn_model(req)
-        self.rospy.sleep(1)
+        time.sleep(1)
 
     #Spawn the slot rod
     def spawnInsertionSlotRod(self):
@@ -183,7 +184,7 @@ class sceneManager:
         req.initial_pose.position.y = 0
         req.initial_pose.position.z = 1.01
         resp = spawn_model(req)
-        self.rospy.sleep(1)
+        time.sleep(1)
 
     #Modify an SDF file to include geometric physical constants
     #To get a list of available Gazebo materials do: 
