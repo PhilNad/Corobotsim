@@ -1,0 +1,96 @@
+# MoveIt-specific simulation settings
+moveit_sim_hw_interface:
+  joint_model_group: controllers_initial_group_
+  joint_model_group_pose: controllers_initial_pose_
+
+# Settings for ros_control control loop
+generic_hw_control_loop:
+  loop_hz: 300
+  cycle_time_error_threshold: 0.01
+
+# Settings for ros_control hardware interface
+hardware_interface:
+  joints:
+    - shoulder_pan_joint
+    - shoulder_lift_joint
+    - elbow_joint
+    - wrist_1_joint
+    - wrist_2_joint
+    - wrist_3_joint
+    - gripper_right_driver_joint
+    - gripper_left_driver_joint
+  sim_control_mode: 1  # 0: position, 1: velocity
+
+# Publish all joint states
+# Creates the /joint_states topic necessary in ROS
+joint_state_controller:
+  type: joint_state_controller/JointStateController
+  publish_rate: 50
+
+#Every controllers must be listed here
+controller_list:
+  - name: arm_controller
+    action_ns: follow_joint_trajectory
+    default: True
+    type: FollowJointTrajectory
+    joints:
+      - shoulder_pan_joint
+      - shoulder_lift_joint
+      - elbow_joint
+      - wrist_1_joint
+      - wrist_2_joint
+      - wrist_3_joint
+  - name: r_gripper_controller
+    action_ns: gripper_cmd
+    default: True
+    type: GripperCommand
+    joints:
+      - gripper_right_driver_joint
+  - name: l_gripper_controller
+    action_ns: gripper_cmd
+    default: True
+    type: GripperCommand
+    joints:
+      - gripper_left_driver_joint
+#  - name: gripper_controller
+#    action_ns: follow_joint_trajectory
+#    default: True
+#    type: FollowJointTrajectory
+#    joints:
+#      - gripper_right_driver_joint
+#      - gripper_left_driver_joint
+#      - gripper_right_follower_joint
+#      - gripper_right_spring_link_joint
+#      - gripper_left_follower_joint
+#      - gripper_left_spring_link_joint
+
+
+#Define a controller for the gripper
+#If a joint is included as part of this controller but is not specified in hardwareInterface/joints, 
+#  ROS will complain that "Could not find joint X in hardwareInterace::PositionJointInterface"
+
+#gripper_controller:
+#  type: position_controllers/JointTrajectoryController
+#  joints:
+#    - gripper_right_driver_joint
+#    - gripper_left_driver_joint
+#    - gripper_right_follower_joint
+#    - gripper_right_spring_link_joint
+#    - gripper_left_follower_joint
+#    - gripper_left_spring_link_joint
+#  constraints:
+#      goal_time: 0.6
+#      stopped_velocity_tolerance: 0.05
+#      gripper_right_driver_joint: {trajectory: 0.1, goal: 0.1}
+#  stop_trajectory_duration: 0.5
+#  state_publish_rate:  25
+#  action_monitor_rate: 10
+
+r_gripper_controller:
+  type: effort_controllers/GripperActionController
+  joint: gripper_right_driver_joint
+
+l_gripper_controller:
+  type: effort_controllers/GripperActionController
+  joint: gripper_left_driver_joint
+

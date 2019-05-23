@@ -1,0 +1,35 @@
+<?xml version="1.0" ?>
+<sdf version="1.5">
+  <world name="default">
+    <physics type="ode">
+      <max_contacts>50</max_contacts>
+      <max_step_size>0.0001</max_step_size> <!-- Old value 0.0005 -->
+      <real_time_factor>1</real_time_factor>
+      <real_time_update_rate>1000</real_time_update_rate>
+      <ode>
+        <solver>
+          <type>quick</type>
+          <iters>50</iters>
+          <sor>1.4</sor>
+        </solver>
+        <constraints>
+          <cfm>0</cfm>
+          <erp>0.2</erp>
+          <contact_max_correcting_vel>0</contact_max_correcting_vel>
+          <contact_surface_layer>0</contact_surface_layer>
+        </constraints>
+      </ode>
+    </physics>
+    <!-- A global light source -->
+    <include>
+      <uri>model://sun</uri>
+    </include>
+    <!-- A ground plane -->
+    <include>
+      <uri>model://ground_plane</uri>
+    </include>
+    <include>
+      <uri>model://table</uri>
+    </include>
+  </world>
+</sdf>

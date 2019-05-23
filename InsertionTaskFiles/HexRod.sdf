@@ -1,0 +1,99 @@
+<?xml version="1.0" ?>
+<sdf version="1.4">
+  <model name="insertion_hexrod">
+    <static>0</static>
+    <link name="hexrod">
+      <inertial>
+	<!-- MESHLAB DATA
+	Meshlab assumes unit density, so the mass equals the volume. Thus, to get the real mass, we need to mutiply
+	the volume by RHO, the density of the material expressed in kg/m^3. The inertia tensor is also using the
+	volume in place of the mass and to get the right values, we must also multiply it by RHO.
+
+	Mesh Bounding Box Size 24.993492 28.860001 200.000000
+	Mesh Volume is 108196.828125
+	Center of Mass is 12.496746 14.429998 100.000000
+	Inertia Tensor is :
+	| 365349728.000000 -3.061880 0.324540 |
+	| -3.061880 365349600.000000 9.958724 |
+	| 0.324540 9.958724 9387199.000000 |
+
+	-->
+	<!-- Location of center of mass (COM) -->
+	<pose>COM_X COM_Y COM_Z 0 0 0</pose>
+        <mass>MASS</mass>
+	<!-- Inertia of cuboid: ih = m(d^2+w^2)/12 ; id = m(h^2+w^2)/12 ; iw = m(d^2+h^2)/12-->
+        <inertia>
+          <ixx>INERTIA_TENSOR_XX</ixx>
+          <ixy>INERTIA_TENSOR_XY</ixy>
+          <ixz>INERTIA_TENSOR_XZ</ixz>
+          <iyy>INERTIA_TENSOR_YY</iyy>
+          <iyz>INERTIA_TENSOR_YZ</iyz>
+          <izz>INERTIA_TENSOR_ZZ</izz>
+        </inertia>
+      </inertial>
+      <collision name="hexrod_collision">
+        <pose>0 0 0 0 0 0</pose>
+        <geometry>
+	  <mesh>
+	    <!-- The part was designed in mm but the model assumes meters. -->
+	    <scale>0.001 0.001 0.001</scale>
+	    <uri>file://../../../../home/pnadeau/Simulation/InsertionTaskFiles/HexRod.dae</uri>
+	  </mesh>
+        </geometry>
+        <surface>
+          <bounce>
+          	<restitution_coefficient>0</restitution_coefficient>
+		<threshold>0.01</threshold>
+	  </bounce>
+          <friction>
+            <ode>
+              <mu>1</mu>
+              <mu2>1</mu2>
+            </ode>
+          </friction>
+          <contact>
+            <ode>
+              <kp>10000000.0</kp>
+              <kd>0.1</kd>
+              <min_depth>0</min_depth>
+              <max_vel>0.0</max_vel>
+	      <!-- CFM is the abbreviation of Constraint Force Mixing. If the CFM set to a positive value, 
+			the hard-contact constraint is softened which means that the constraint is allowed to be violated. 
+			This helps simulation to be more stable but not causes unrealistic result such as penetration and 
+			position drift. -->
+              <soft_cfm>0.2</soft_cfm>
+	      <!-- ERP stands for Error Reduction Parameter that fixes position error after one simulation step. 
+			As ERP is set to a non-zero value, simulation attempts to fix the position drift by 
+			applying additional force. This prevents position-level drift: as ERP set to non-zero value, 
+			the penetration error is significantly reduced -->
+              <soft_erp>0.2</soft_erp>
+            </ode>
+          </contact>
+        </surface>
+      </collision>
+      <visual name="hexrod_visual">
+        <pose>0 0 0 0 0 0</pose>
+        <geometry>
+	  <mesh>
+	    <!-- The part was designed in mm but the model assumes meters. -->
+            <scale>0.001 0.001 0.001</scale>
+            <uri>file://../../../../home/pnadeau/Simulation/InsertionTaskFiles/HexRod.stl</uri>
+          </mesh>
+        </geometry>
+        <material>
+          <script>
+            <uri>file://media/materials/scripts/gazebo.material</uri>
+            <name>Gazebo/Bricks</name>
+          </script>
+        </material>
+      </visual>
+      <velocity_decay>
+        <linear>0.000000</linear>
+        <angular>0.000000</angular>
+      </velocity_decay>
+      <self_collide>0</self_collide>
+      <kinematic>0</kinematic>
+      <gravity>1</gravity>
+    </link>
+  </model>
+</sdf>

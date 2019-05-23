@@ -1,0 +1,217 @@
+<?xml version="1.0"?>
+<launch>
+	<arg name="robot_ip" default="192.168.2.101" doc="IP of the controller" />
+	<arg name="reverse_port" default="50001" doc="Port on which controller listens for position values passed to servoj thread from the driver" />
+        <arg name="gripperTTY" default="/dev/ttyUSB0"  doc="Device file like /dev/ttyUSB0. Requires: sudo chmod /dev/ttyUSB0" />
+        <arg name="sim" default="false" />
+
+	<!-- These arguments can be given to this launch file -->
+	<arg name="robot_description" default="robot_description"/>
+	<arg name="limited" default="true"  doc="If true, limits joint range [-PI, PI] on all joints." />
+	<arg name="paused" default="false" doc="Starts gazebo in paused mode" />
+	<arg name="gui" default="true" doc="Starts gazebo gui" />
+	<arg name="debug" default="false" doc="Uses GDB and output verbose informations." />
+
+	<arg name="prefix" default="" doc="Prefix to robot's joints' and links' names" />
+	<arg name="launch_prefix" default="" />
+
+	<!-- The max_velocity parameter is only used for debugging in the ur_driver. It's not related to actual velocity limits -->
+	<arg name="max_velocity" default="10.0"/> <!-- [rad/s] -->
+	<arg name="min_payload"  default="0.0" doc="lower payload bound for the robot" />
+	<arg name="max_payload"  default="10.0" doc="upper payload bound for the robot" />
+
+        <!-- move_group settings -->
+	<arg name="allow_trajectory_execution" default="true"/>
+	<arg name="max_safe_path_cost" default="1"/>
+	<arg name="jiggle_fraction" default="0.05" />
+	<arg name="publish_monitored_planning_scene" default="true"/>
+
+        <!-- Verbose Mode Option -->
+	<arg name="info" default="$(arg debug)" />
+	<arg unless="$(arg info)" name="command_args" value="" />
+	<arg     if="$(arg info)" name="command_args" value="--debug" />
+
+        <!-- require_activation defines when the service /ur_driver/robot_enable needs to be called. -->
+        <arg name="require_activation" default="Never" /> <!-- Never, Always, OnStartup -->
+  
+	<!-- Start gazebo server and client -->
+	<include if="$(arg sim)" file="$(find gazebo_ros)/launch/empty_world.launch">
+		<arg name="paused" value="$(arg paused)"/>
+		<arg name="use_sim_time" value="true"/>
+		<arg name="extra_gazebo_args" value=""/>
+		<arg name="gui" value="$(arg gui)"/>
+		<arg name="recording" value="false"/>
+		<!-- Note that 'headless' is currently non-functional.  See gazebo_ros_pkgs issue #491 (-r arg does not disable
+		rendering, but instead enables recording). The arg definition has been left here to prevent breaking downstream
+		launch files, but it does nothing. -->
+		<arg name="headless" value="false"/>
+		<arg name="debug" value="$(arg debug)"/>
+		<arg name="physics" value="ode"/>
+		<arg name="verbose" value="$(arg debug)"/>
+		<!-- Note: the world_name is with respect to GAZEBO_RESOURCE_PATH environmental variable -->
+		<!-- Constraints are meant to be broken -->
+		<arg name="world_name" value="$(eval env('PWD') + '/coro.world')"/>
+		<arg name="respawn_gazebo" value="false"/>
+		<arg name="use_clock_frequency" value="false"/>
+		<arg name="pub_clock_frequency" value="100"/>
+		<arg name="enable_ros_network" value="true" />
+	</include>
+
+	<!-- 	Specify the robot URDF and SDF to the parameter server through these particular variable names -->
+	<!--
+		WATCH OUT: If the URDF model has joints that are not actuated, the PlanningSceneMonitor::updateSceneWithCurrentState() will complain that 
+		"The complete state of the robot is not yet known." You can use <mimic/> tags to actuate an underactuated joint with a gear ratio
+		OR you can add a <transmission/> tag in the URDF for every actuated joints. 
+	-->
+	<param if="$(arg sim)" name="robot_description_sdf" textfile="$(eval env('PWD') + '/CoroModel.sdf')" />
+	<param name="robot_description" textfile="$(eval env('PWD') + '/CoroModel.urdf')" />
+	<!-- The semantic description is used by MoveIt to relate links and joints to parts of the robot. It must correspond to the URDF. -->
+	<param name="$(arg robot_description)_semantic" textfile="$(find CoroMoveIt)/config/coro.srdf" />
+
+	<!-- copy the specified IP address to be consistant with ROS-Industrial spec.
+	NOTE: The ip address is actually passed to the driver on the command line -->
+	<param name="/robot_ip_address" type="str" value="$(arg robot_ip)"/>
+	<param name="/robot_reverse_port" type="int" value="$(arg reverse_port)"/>
+
+	<!-- push robot_description to factory and spawn robot in gazebo -->
+	<!-- You NEED to put the robot above the ground plane (z>0) or else it will collide with the ground plane and jitter  -->
+	<!-- The table within our world has a height of 1 meter, we set the robot base 0.3m above the table to replicate CoRo's setup -->
+	<!-- If you get this error Ogre: "The minimum corner of the box must be less than or equal to maximum corner", verify that all STL/DAE files are OK/exists. -->
+	<node if="$(arg sim)" name="spawn_gazebo_model" pkg="gazebo_ros" type="spawn_model" args="-sdf -param robot_description_sdf -model coro -x 0 -y 0 -z 1.3" respawn="false" output="screen" />
+
+	<!-- Load updated joint limits (override information from URDF) -->
+	<group ns="$(arg robot_description)_planning">
+		<rosparam command="load" file="$(find CoroMoveIt)/config/joint_limits.yaml"/>
+	</group>
+
+	<!-- Load default settings for kinematics; these settings are overridden by settings in a node's namespace 
+		This file specify which Kinematics solver to use to compute the SRDF's GROUP kinematics.
+		We should not include the gripper within this file because the kinematics of the gripper cannot be solved since its not a CHAIN.
+	-->
+	<group ns="$(arg robot_description)_kinematics">
+		<rosparam command="load" file="$(find CoroMoveIt)/config/kinematics.yaml"/>
+	</group>
+
+	<!-- Old driver, works with UR5 CB2 1.18.11 but you cannot use the speed reducer of the teach pendant. -->
+	<!-- New driver (ur_modern_driver) doesnt work with Real UR5 CB2 1.18.11 - PN (01 May 2019) -->
+	<node unless="$(arg sim)" name="ur_driver" pkg="ur_driver" type="driver.py" args="$(arg robot_ip) $(arg reverse_port)" output="screen">
+		<param name="min_payload" type="double" value="$(arg min_payload)"/>
+		<param name="max_payload" type="double" value="$(arg max_payload)"/>
+		<param name="max_velocity" type="double" value="$(arg max_velocity)"/>
+		<param name="prefix" type="string" value="$(arg prefix)"/>
+        </node>
+
+	<!-- TF Buffer Server -->
+	<node pkg="tf2_ros" type="buffer_server" name="tf2_buffer_server">
+		<param name="buffer_size" value="120.0"/>
+	</node>
+
+	<!-- Planning Functionality -->
+	<include if="$(arg sim)" ns="move_group" file="$(find CoroMoveIt)/launch/planning_pipeline.launch.xml">
+		<arg name="pipeline" value="ompl" />
+	</include>
+	<include unless="$(arg sim)" ns="move_group" file="$(find ur5_moveit_config)/launch/planning_pipeline.launch.xml">
+		<arg name="pipeline" value="ompl" />
+	</include>
+
+	<!-- Trajectory Execution Functionality -->
+	<include if="$(arg sim)" ns="move_group" file="$(find CoroMoveIt)/launch/trajectory_execution.launch.xml">
+		<arg name="moveit_manage_controllers" value="true" />
+		<arg name="moveit_controller_manager" value="coro"/>
+	</include>
+	<include unless="$(arg sim)" ns="move_group" file="$(find ur5_moveit_config)/launch/trajectory_execution.launch.xml">
+		<arg name="moveit_manage_controllers" value="true" />
+		<arg name="moveit_controller_manager" value="ur5" />
+	</include>
+
+        <!-- Since we often slow down the robot speed, disable trajectory duration monitoring -->
+        <!-- Overrides default parameters -->
+        <param unless="$(arg sim)" name="move_group/trajectory_execution/allowed_execution_duration_scaling" value="10.0" />
+        <param unless="$(arg sim)" name="move_group/trajectory_execution/execution_duration_monitoring" value="false" />
+        <param unless="$(arg sim)" name="move_group/trajectory_execution/allowed_goal_duration_margin" value="10" /> 
+
+	<!-- Start the actual move_group node/action server -->
+	<node name="move_group" launch-prefix="$(arg launch_prefix)" pkg="moveit_ros_move_group" type="move_group" respawn="false" output="screen" args="$(arg command_args)">
+		<env name="DISPLAY" value="$(optenv DISPLAY :0)" />
+
+		<param name="allow_trajectory_execution" value="$(arg allow_trajectory_execution)"/>
+		<param name="max_safe_path_cost" value="$(arg max_safe_path_cost)"/>
+		<param name="jiggle_fraction" value="$(arg jiggle_fraction)" />
+		<!-- MoveGroup capabilities to load -->
+		<param name="capabilities" value="move_group/MoveGroupCartesianPathService
+					      move_group/MoveGroupExecuteTrajectoryAction
+					      move_group/MoveGroupKinematicsService
+					      move_group/MoveGroupMoveAction
+					      move_group/MoveGroupPickPlaceAction
+					      move_group/MoveGroupPlanService
+					      move_group/MoveGroupQueryPlannersService
+					      move_group/MoveGroupStateValidationService
+					      move_group/MoveGroupGetPlanningSceneService
+					      move_group/ClearOctomapService
+					      " />
+		<!-- Publish the planning scene of the physical robot so that rviz plugin can know actual robot -->
+		<param name="planning_scene_monitor/publish_planning_scene" value="$(arg publish_monitored_planning_scene)" />
+		<param name="planning_scene_monitor/publish_geometry_updates" value="$(arg publish_monitored_planning_scene)" />
+		<param name="planning_scene_monitor/publish_state_updates" value="$(arg publish_monitored_planning_scene)" />
+		<param name="planning_scene_monitor/publish_transforms_updates" value="$(arg publish_monitored_planning_scene)" />
+	</node>
+
+  	<!-- Run Rviz and load the default config to see the state of the move_group node -->
+	<include unless="$(arg sim)" file="$(find CoroMoveIt)/launch/moveit_rviz.launch">
+		<arg name="config" value="true"/>
+		<arg name="debug" value="$(arg debug)"/>
+	</include>
+
+	<!-- ABOUT CONTROLLERS
+		It seems that the configuration file used to define the joints actuated within gripper_controller is /home/pnadeau/Simulation/robotiq_85_controller.yaml
+		It seems that MoveIt uses this file internally : $(find CoroMoveIt)/config/fake_controllers.yaml
+		It seems that MoveIt uses this file internally : $(find CoroMoveIt)/config/ros_controllers.yaml 
+		So WATCH OUT!! : The controller list must be mirrored from robotiq_85_controller.yaml to these two files
+		It seems that when you are using a controller of type position_controllers/JointTrajectoryController , you need to specify every joint in the kinematic chain. I expect that to be 
+			an issue for passive joints.
+		The controller of type position_controllers/GripperActionController can be used with only one actuated joint but seems to TIMEOUT when working with a closed kinematic chain.
+		In the URDF file, a transmission tag should be used for every actuated joint in the robot. Once a transmission gets defined for a joint it seems that Gazebo reports a very high 
+			friction for that joint (equal to max_effort), effectively stalling the joint. It seems possible to increse the max_effort limit for that joint through the SDF although
+			the effects are unknown so far.
+		The controller configuration is defined in YAML files. This file must include some MoveIt specific informations, some informations related to the publication of joint states
+			and also the definition of controllers (like gripper_controller). For the gripper, we use exclusively the robotiq_85_controller.yaml file.
+		Moveit does not support the ros control GripperAction controller, only the FollowJointAction. (https://github.com/beta-robots/robotiq/commit/a1ca4c2bc4ad8b05a966bdff63714ed2da81a543)
+	-->
+
+  	<!-- Robot state publisher -->
+  	<!-- robot_state_publisher uses the URDF specified by the parameter robot_description and the joint positions from the topic joint_states to calculate the forward kinematics 
+		of the robot and publish the results via tf. -->
+	<node pkg="robot_state_publisher" type="robot_state_publisher" name="robot_state_publisher">
+		<param name="publish_frequency" type="double" value="50.0" />
+		<param name="tf_prefix" type="string" value="" />
+	</node>
+
+  	<!-- Fake Calibration -->
+	<node if="$(arg sim)" pkg="rostopic" type="rostopic" name="fake_joint_calibration" args="pub /calibrated std_msgs/Bool true" />
+
+  	<!-- Load controller for the arm -->
+  	<!-- WATCH OUT: Buckle up, this is twisted. According to (https://github.com/ros-industrial/universal_robot/commit/6c4318a3c0024be31e919cdd30741456f4eaf778#comments)
+ 		using a position or velocity controller with Gazebo breaks the inner working and some people have reported that it broke the simulator's friction when grasping.
+		This is exactly what we spent two weeks figuring out! To bypass this very serious problem, we use an effort controller to move the arm as per the folowing YAML
+		Picking object worked pretty much out of the box once EffortJointInterface was used instead of PositionJointInterface
+  	-->
+	<rosparam if="$(arg sim)" file="$(eval env('PWD') + '/ur5_arm_controller.yaml')" command="load"/>
+	<node if="$(arg sim)" name="arm_controller_spawner" pkg="controller_manager" type="controller_manager" args="spawn arm_controller" output="screen"/>
+  
+  	<!-- Load controllers for the gripper -->
+	<rosparam if="$(arg sim)" file="$(eval env('PWD') + '/robotiq_2f85_controller.yaml')" command="load" />
+	<node if="$(arg sim)" name="l_gripper_controller_spawner" pkg="controller_manager" type="controller_manager" args="spawn l_gripper_controller" output="screen" />
+	<node if="$(arg sim)" name="r_gripper_controller_spawner" pkg="controller_manager" type="controller_manager" args="spawn r_gripper_controller" output="screen" />
+
+  	<!-- joint_state_controller -->
+  	<!-- Controller to publish joint state, the published joints are defined in robotiq_85_controller.yaml -->
+	<rosparam if="$(arg sim)" file="$(find ur_gazebo)/controller/joint_state_controller.yaml" command="load"/>
+	<node if="$(arg sim)" name="joint_state_controller_spawner" pkg="controller_manager" type="controller_manager" args="spawn joint_state_controller" respawn="false" output="screen"/>
+
+	<!-- Launch gripper service -->
+        <include file="$(find gripper_2f85)/launch/gripper_2f85.launch">
+            <arg name="simulation" value="$(arg sim)" />
+            <arg name="gripperTTY" value="$(arg gripperTTY)" />
+        </include>
+
+</launch>

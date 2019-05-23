@@ -1,0 +1,50 @@
+<?xml version="1.0"?>
+<robot name="coro" xmlns:xacro="http://ros.org/wiki/xacro" >
+
+	<!-- On the first day, Darwin created the world -->
+        <link name="world"/>
+
+	<!-- Add UR5 model to our world -->
+        <xacro:include filename="$(find ur_description)/urdf/ur5.urdf.xacro" />
+	
+	<!-- Attach UR5's base to the ground so it doesnt fall over -->
+        <joint name="fixed" type="fixed">
+                <parent link="world"/>
+                <child link="base_link"/>
+        </joint>
+	
+	<!-- Instanciate a UR5 -->
+	<xacro:ur5_robot prefix="" joint_limited="true"
+    		shoulder_pan_lower_limit="${-2*pi}" shoulder_pan_upper_limit="${2*pi}"
+    		shoulder_lift_lower_limit="${-2*pi}" shoulder_lift_upper_limit="${2*pi}"
+    		elbow_joint_lower_limit="${-2*pi}" elbow_joint_upper_limit="${2*pi}"
+    		wrist_1_lower_limit="${-2*pi}" wrist_1_upper_limit="${2*pi}"
+    		wrist_2_lower_limit="${-2*pi}" wrist_2_upper_limit="${2*pi}"
+    		wrist_3_lower_limit="${-2*pi}" wrist_3_upper_limit="${2*pi}"
+  	/>
+
+
+	<!-- Add Robotiq 2f-85 gripper from Beta robotics -->
+        <xacro:include filename="robotiq_2f85.urdf.xacro" />
+	<xacro:robotiq_2f_85 parent="ee_link" name="gripper" precise_collision="true" adaptive_transmission="false" with_pads="true" >
+		<origin xyz="0 0 0" rpy="0 ${pi/2} 0"/>
+	</xacro:robotiq_2f_85>
+
+	<!-- Add a force torque senssor on the wrist -->	
+	<gazebo reference="wrist_3_joint">
+    		<sensor name="wrist_3_force_torque" type="force_torque">
+      			<always_on>true</always_on>
+      			<update_rate>30.0</update_rate>
+      			<visualize>true</visualize>
+      			<force_torque>
+        			<frame>sensor</frame>
+        			<measure_direction>child_to_parent</measure_direction>
+      			</force_torque>
+    		</sensor>
+  	</gazebo>
+
+	<gazebo>
+        	<plugin name="gazebo_ros_control" filename="libgazebo_ros_control.so">
+        	</plugin>
+        </gazebo>
+</robot>
